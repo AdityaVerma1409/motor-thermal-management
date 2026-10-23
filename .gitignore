@@ -1,0 +1,6 @@
+# Ignore dataset files
+*.csv
+*.parquet
+*.h5
+*.npy
+data/
