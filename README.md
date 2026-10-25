@@ -94,6 +94,12 @@ To prove deployment feasibility on automotive microcontrollers (e.g., Infineon A
    - `figure2_advisory_forecast.png` (Uncooled vs Cooled trajectory with safety limit and cooling window)
    - `figure3_coolant_paradox.png` (KNN paradox vs Monotonic HistGBM fix)
 
+4. **Benchmark on the 30,000-sample dataset (`motor_temperature_30000.csv`)**:
+   ```bash
+   python 4_dataset_30k_benchmark.py
+   ```
+   *Runs 5-fold cross-validation on the uniform 30k cross-profile dataset for both Full Sensor Suite and Inverter-Only Sensorless Rotor Estimation, saving `results_30k_benchmark.csv`.*
+
 ---
 
 ## 8. Academic References
