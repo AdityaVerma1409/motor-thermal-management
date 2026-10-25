@@ -53,12 +53,13 @@ class MotorThermalAdvisor:
         y = df_thinned["delta_pm"]
         self.model.fit(X, y)
         
-        # Fit KNN on a subset for the Coolant Paradox comparison
+        # Fit KNN on a uniform subsample across all profiles for the Coolant Paradox comparison
         self.knn_model = Pipeline([
             ("scaler", StandardScaler()),
             ("model", KNeighborsRegressor(n_neighbors=15, weights="distance"))
         ])
-        self.knn_model.fit(X.iloc[:25000], y.iloc[:25000])
+        sample_idx = X.sample(n=min(35000, len(X)), random_state=42).index
+        self.knn_model.fit(X.loc[sample_idx], y.loc[sample_idx])
         print("Training complete! Model is ready for real-time 30-minute rollouts.")
 
     def simulate_rollout(self, initial_state, start_step=0, dur_steps=0, cool_drop=10.0):
@@ -264,13 +265,15 @@ if __name__ == "__main__":
     # Uncooled preview to set a realistic safety limit that motor would exceed
     uncooled_preview = advisor.simulate_rollout(high_load_sample, start_step=0, dur_steps=0)
     peak_pred = float(np.max(uncooled_preview))
-    t_limit = round(high_load_sample["pm"] + 0.5 * (peak_pred - high_load_sample["pm"]), 1)
+    # Set realistic safety limit that triggers cooling intervention but is physically achievable
+    cool_drop = 12.0
+    t_limit = round(peak_pred - 0.4 * cool_drop, 1)
     if t_limit <= high_load_sample["pm"]:
-        t_limit = round(high_load_sample["pm"] + 5.0, 1)
+        t_limit = round(high_load_sample["pm"] + 10.0, 1)
 
     print(f"\nEvaluating against Safety Threshold: {t_limit:.1f} deg C ...")
     t0 = time.time()
-    adv = advisor.compute_advisory(high_load_sample, t_limit=t_limit, cool_drop=12.0)
+    adv = advisor.compute_advisory(high_load_sample, t_limit=t_limit, cool_drop=cool_drop)
     elapsed = (time.time() - t0) * 1000
 
     print("\n" + "=" * 70)
@@ -288,7 +291,11 @@ if __name__ == "__main__":
         print(f"[T3] Cooling Start Advisory:  No cooling required")
 
     print(f"[T4] Required Duration:       Run cooling for {adv['t4_duration_seconds']:.0f}s ({adv['t4_duration_seconds']/60:.1f} minutes)")
-    print(f"[T5] Post-Cooling Profile:    Peak stays at {adv['t5_peak']:.2f} deg C (below {t_limit} deg C!)")
+    if adv['alarm']:
+        print(f"[T5] Post-Cooling Profile:    Peak reaches {adv['t5_peak']:.2f} deg C (Alarm: Exceeds {t_limit:.1f} deg C even with max cooling)")
+    else:
+        print(f"[T5] Post-Cooling Profile:    Peak successfully kept at {adv['t5_peak']:.2f} deg C (below {t_limit:.1f} deg C limit)")
+
     shutoff_text = f"{adv['t5_shutoff']:.2f} deg C" if adv['t5_shutoff'] is not None else "N/A"
     print(f"     Shut-Off Temperature:    {shutoff_text}")
     print(f"     End of 30-min Horizon:   {adv['t5_end']:.2f} deg C")

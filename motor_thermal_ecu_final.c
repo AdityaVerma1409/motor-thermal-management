@@ -305,6 +305,7 @@ void Mth_Advisory(Mth_Advisory_t *out,
     out->T2_peak = unc_pk;
 
     /* T2 — limit crossing time (inline scan) */
+    float unc_end = Tp0;
     {
         float tp = Tp0, ts = Ts0;
         uint16_t cross = 0xFFFFU;
@@ -319,6 +320,7 @@ void Mth_Advisory(Mth_Advisory_t *out,
             ts = (c.a11*b2 - c.a21*b1) * c.inv_det;
             if ((tp >= Tlim) && (cross == 0xFFFFU)) { cross = k+1U; }
         }
+        unc_end = tp;
         out->T2_cross_s = (cross == 0xFFFFU) ? -1.0f
                           : (float)cross * MTH_DT;
     }
@@ -327,7 +329,7 @@ void Mth_Advisory(Mth_Advisory_t *out,
     {
         out->T3_cmd_s = -1.0f;   out->T4_dur_s = -1.0f;
         out->T5_peak = unc_pk;   out->T5_off = unc_pk;
-        out->T5_end = unc_pk;
+        out->T5_end = unc_end;
         return;
     }
 
@@ -340,7 +342,7 @@ void Mth_Advisory(Mth_Advisory_t *out,
     {
         out->T3_cmd_s = 0.0f;
         out->T4_dur_s = (float)MTH_HORIZON * MTH_DT;
-        out->T5_peak = unc_pk; out->T5_off = unc_pk; out->T5_end = unc_pk;
+        out->T5_peak = unc_pk; out->T5_off = unc_pk; out->T5_end = unc_end;
         out->alarm = 1U;
         return;
     }
