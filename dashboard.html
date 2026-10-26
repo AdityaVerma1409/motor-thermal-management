@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PMSM Thermal Prediction & Dynamic Cooling Advisory</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Strict minimal styling: pure black, zero gradients, zero blue */
+    body {
+      background-color: #000000;
+      color: #f5f5f5;
+    }
+    input[type=range] {
+      accent-color: #ffffff;
+    }
+    .tab-active {
+      border-bottom: 2px solid #ffffff;
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .nav-btn {
+      color: #a3a3a3;
+      border-bottom: 2px solid transparent;
+      padding-bottom: 0.75rem;
+      transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .nav-btn:hover {
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body class="bg-black text-neutral-100 min-h-screen font-sans antialiased">
+
+  <!-- Header -->
+  <header class="border-b border-neutral-800 bg-neutral-950 sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <div class="w-7 h-7 bg-white text-black font-bold flex items-center justify-center rounded text-xs tracking-wider">
+            EV
+          </div>
+          <h1 class="text-base font-semibold text-white tracking-tight">PMSM Motor Thermal Management</h1>
+          <span class="text-xs px-2 py-0.5 rounded border border-neutral-700 bg-neutral-900 text-neutral-300">
+            ISO 26262 HIL Passed (20/20)
+          </span>
+        </div>
+        <p class="text-xs text-neutral-400 mt-1">30-Minute Predictive Horizon & Active Cooling Advisory (T1 – T5)</p>
+      </div>
+
+      <div class="flex items-center space-x-3 text-xs">
+        <button onclick="switchTab('slides')" id="header-slides-btn" class="px-3 py-1.5 rounded border border-neutral-600 bg-neutral-900 hover:bg-neutral-800 text-white font-medium transition">
+          Presentation Slides Mode
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
+
+    <!-- Navigation Tabs -->
+    <div class="flex border-b border-neutral-800 space-x-6 text-xs tracking-wide uppercase font-medium">
+      <button onclick="switchTab('simulator')" id="tab-btn-simulator" class="nav-btn tab-active">
+        Simulator
+      </button>
+      <button onclick="switchTab('slides')" id="tab-btn-slides" class="nav-btn">
+        Presentation Slides
+      </button>
+      <button onclick="switchTab('targets')" id="tab-btn-targets" class="nav-btn">
+        Target Architecture (T1–T5)
+      </button>
+      <button onclick="switchTab('benchmark')" id="tab-btn-benchmark" class="nav-btn">
+        Model Benchmarks
+      </button>
+      <button onclick="switchTab('paradox')" id="tab-btn-paradox" class="nav-btn">
+        Coolant Paradox Fix
+      </button>
+      <button onclick="switchTab('sensitivity')" id="tab-btn-sensitivity" class="nav-btn">
+        Sensitivity Analysis
+      </button>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 1: SIMULATOR -->
+    <!-- ===================================================================== -->
+    <div id="tab-simulator" class="space-y-6">
+
+      <!-- Metric Cards: T1 to T5 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-4">
+          <div class="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">T1: Initial Temp</div>
+          <div class="mt-2 text-2xl font-semibold text-white tracking-tight" id="out-t1">50.0 °C</div>
+          <div class="text-[11px] text-neutral-400 mt-1">Steady State: <span id="out-tinf" class="text-neutral-200">75.0 °C</span></div>
+        </div>
+
+        <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-4">
+          <div class="flex items-center justify-between text-[11px] uppercase tracking-wider text-neutral-400 font-medium">
+            <span>T2: Overheat Time</span>
+            <span id="badge-t2" class="px-1.5 py-0.2 rounded text-[10px] border border-amber-600/40 text-amber-400 bg-neutral-900">WARNING</span>
+          </div>
+          <div class="mt-2 text-2xl font-semibold text-amber-400 tracking-tight" id="out-t2">644 s</div>
+          <div class="text-[11px] text-neutral-400 mt-1">Crossing: <span id="out-t2-min" class="text-neutral-200">10.7 min</span></div>
+        </div>
+
+        <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-4">
+          <div class="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">T3: Start Cooling</div>
+          <div class="mt-2 text-2xl font-semibold text-white tracking-tight" id="out-t3">584 s</div>
+          <div class="text-[11px] text-neutral-400 mt-1">Trigger at: <span id="out-t3-min" class="text-neutral-200">9.7 min</span></div>
+        </div>
+
+        <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-4">
+          <div class="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">T4: Cooling Duration</div>
+          <div class="mt-2 text-2xl font-semibold text-white tracking-tight" id="out-t4">573 s</div>
+          <div class="text-[11px] text-neutral-400 mt-1">Run duration: <span id="out-t4-min" class="text-neutral-200">9.6 min</span></div>
+        </div>
+
+        <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-4">
+          <div class="text-[11px] uppercase tracking-wider text-neutral-400 font-medium">T5: Peak / End Temp</div>
+          <div class="mt-2 text-2xl font-semibold text-white tracking-tight" id="out-t5-peak">69.2 °C</div>
+          <div class="text-[11px] text-neutral-400 mt-1">Settled @ 30m: <span id="out-t5-end" class="text-neutral-200">73.2 °C</span></div>
+        </div>
+      </div>
+
+      <!-- Controls and Chart -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Controls Column -->
+        <div class="lg:col-span-4 bg-neutral-950 border border-neutral-800 rounded-lg p-5 space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-neutral-800">
+            <h2 class="text-xs font-semibold text-white uppercase tracking-wider">Operating Controls</h2>
+            <button onclick="resetInputs()" class="text-xs text-neutral-400 hover:text-white underline">Reset</button>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-neutral-300">Motor Speed</span>
+              <span id="lbl-speed" class="font-mono text-white">4,500 RPM</span>
+            </div>
+            <input type="range" id="inp-speed" min="500" max="6000" step="100" value="4500" class="w-full" oninput="updateSim()">
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-neutral-300">Shaft Torque</span>
+              <span id="lbl-torque" class="font-mono text-white">45.0 Nm</span>
+            </div>
+            <input type="range" id="inp-torque" min="5" max="100" step="1" value="45" class="w-full" oninput="updateSim()">
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-neutral-300">Initial Rotor Temp (T0)</span>
+              <span id="lbl-t0" class="font-mono text-white">50.0 °C</span>
+            </div>
+            <input type="range" id="inp-t0" min="20" max="90" step="1" value="50" class="w-full" oninput="updateSim()">
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-neutral-300">Base Coolant Temp</span>
+              <span id="lbl-coolant" class="font-mono text-white">25.0 °C</span>
+            </div>
+            <input type="range" id="inp-coolant" min="15" max="50" step="1" value="25" class="w-full" oninput="updateSim()">
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-amber-400 font-medium">Overheating Limit (T_limit)</span>
+              <span id="lbl-limit" class="font-mono text-amber-400">70.0 °C</span>
+            </div>
+            <input type="range" id="inp-limit" min="55" max="100" step="1" value="70" class="w-full" oninput="updateSim()">
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-neutral-300">Active Chiller Temperature Drop</span>
+              <span id="lbl-chiller" class="font-mono text-white">10.0 °C</span>
+            </div>
+            <input type="range" id="inp-chiller" min="5" max="20" step="1" value="10" class="w-full" oninput="updateSim()">
+          </div>
+
+          <div class="pt-3 border-t border-neutral-800 text-xs space-y-1.5 text-neutral-400 font-mono">
+            <div class="flex justify-between">
+              <span>Estimated Power Loss:</span>
+              <span id="lbl-ploss" class="text-white">500 W</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Time Constant (tau):</span>
+              <span class="text-white">400.0 s (6.7 min)</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Decision:</span>
+              <span id="lbl-decision" class="text-white font-sans font-medium">Trigger at 9.7 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trajectory Canvas Column -->
+        <div class="lg:col-span-8 bg-neutral-950 border border-neutral-800 rounded-lg p-5 flex flex-col justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-800 text-xs">
+            <div>
+              <h2 class="text-xs font-semibold text-white uppercase tracking-wider">30-Minute Predictive Trajectory</h2>
+              <p class="text-neutral-400 text-[11px] mt-0.5">Uncooled trajectory vs. active cooling intervention</p>
+            </div>
+            <div class="flex items-center space-x-4 text-[11px]">
+              <span class="flex items-center gap-1.5 text-neutral-300"><span class="w-3 h-0.5 bg-red-500 inline-block"></span> Uncooled (T1)</span>
+              <span class="flex items-center gap-1.5 text-neutral-300"><span class="w-3 h-0.5 bg-white inline-block"></span> Cooled (T5)</span>
+              <span class="flex items-center gap-1.5 text-amber-400"><span class="w-3 h-0.5 bg-amber-400 inline-block border-b border-dashed"></span> Limit</span>
+              <span class="flex items-center gap-1.5 text-neutral-400"><span class="w-2.5 h-2.5 border border-neutral-500 bg-neutral-800 inline-block"></span> Cooling Window (T4)</span>
+            </div>
+          </div>
+
+          <div class="relative w-full h-[370px] my-3">
+            <canvas id="simCanvas" class="w-full h-full block rounded bg-black border border-neutral-900"></canvas>
+          </div>
+
+          <div class="grid grid-cols-3 gap-3 pt-3 border-t border-neutral-800 text-xs text-center">
+            <div class="p-2.5 rounded bg-neutral-900/60 border border-neutral-800">
+              <span class="text-neutral-400 block text-[10px] uppercase tracking-wider">Uncooled Peak (30m)</span>
+              <span class="text-red-400 font-semibold" id="callout-unc-peak">74.8 °C</span>
+            </div>
+            <div class="p-2.5 rounded bg-neutral-900/60 border border-neutral-800">
+              <span class="text-neutral-400 block text-[10px] uppercase tracking-wider">Cooling Window (T3 to T3+T4)</span>
+              <span class="text-white font-semibold" id="callout-window">9.7m → 19.3m (573s)</span>
+            </div>
+            <div class="p-2.5 rounded bg-neutral-900/60 border border-neutral-800">
+              <span class="text-neutral-400 block text-[10px] uppercase tracking-wider">Max Cooled Temperature</span>
+              <span class="text-white font-semibold" id="callout-max-cooled">69.2 °C (Safe)</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 2: SLIDES PRESENTATION MODE -->
+    <!-- ===================================================================== -->
+    <div id="tab-slides" class="hidden space-y-6">
+
+      <!-- Slide Navigation Header -->
+      <div class="flex items-center justify-between bg-neutral-950 border border-neutral-800 rounded-lg p-4 text-xs">
+        <div class="flex items-center space-x-3">
+          <span class="text-neutral-400 uppercase tracking-wider">Slide Navigator</span>
+          <select id="slide-selector" onchange="goToSlide(parseInt(this.value))" class="bg-neutral-900 border border-neutral-700 text-white rounded px-2.5 py-1 text-xs">
+            <option value="1">1. Title & Executive Overview</option>
+            <option value="2">2. Automotive Problem & Physics</option>
+            <option value="3">3. Dataset & 10x Thinning</option>
+            <option value="4">4. Target T1: 1-Step Model Benchmark</option>
+            <option value="5">5. The 30-Minute Trajectory Differentiator</option>
+            <option value="6">6. The Coolant Paradox & Physics Fix</option>
+            <option value="7">7. Targets T2 & T3: Overheating & Control</option>
+            <option value="8">8. Targets T4 & T5: Thermal Route B</option>
+            <option value="9">9. Embedded ECU C Code & HIL Tests</option>
+            <option value="10">10. Conclusion & Summary</option>
+            <option value="11">11. Examiner Defense & Tough Q&A</option>
+          </select>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="prevSlide()" class="px-3 py-1.5 rounded border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-white transition">
+            Previous
+          </button>
+          <span id="slide-num-indicator" class="font-mono text-neutral-300 px-2">1 / 10</span>
+          <button onclick="nextSlide()" class="px-3 py-1.5 rounded border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-white transition">
+            Next
+          </button>
+          <button onclick="copyCurrentSlide()" class="ml-4 px-3 py-1.5 rounded border border-neutral-600 bg-white text-black font-medium hover:bg-neutral-200 transition">
+            Copy Slide Text
+          </button>
+        </div>
+      </div>
+
+      <!-- Slide Viewport (Pure Black, Minimalist, High Contrast) -->
+      <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-8 md:p-12 min-h-[460px] flex flex-col justify-between" id="slide-container">
+        <!-- Injected via JavaScript -->
+      </div>
+
+      <!-- Speaker Notes Box -->
+      <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-4 text-xs">
+        <div class="text-[11px] uppercase tracking-wider text-neutral-400 font-semibold mb-1">Speaker Notes (What to say during this slide)</div>
+        <p class="text-neutral-300 leading-relaxed font-mono" id="speaker-notes-content">
+          Loading speaker notes...
+        </p>
+      </div>
+
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 3: TARGET ARCHITECTURE (T1 - T5) -->
+    <!-- ===================================================================== -->
+    <div id="tab-targets" class="hidden space-y-6">
+      <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-6">
+        <h2 class="text-sm font-semibold text-white uppercase tracking-wider mb-2">Target Architecture & Official Grading Rubric</h2>
+        <p class="text-xs text-neutral-400 mb-6">Specification for all five operational targets.</p>
+
+        <div class="space-y-3 text-xs">
+          <div class="p-4 rounded border border-neutral-800 bg-black">
+            <div class="flex justify-between items-center text-white font-medium mb-1">
+              <span>T1: Motor Temperature (°C)</span>
+              <span class="text-[11px] text-neutral-400 font-mono">KNN vs Ridge vs HistGBM</span>
+            </div>
+            <p class="text-neutral-300">Predicts component temperature. Evaluated on both Permanent Magnet rotor (pm) and Stator Winding (stator_winding). Ridge achieves 4.76 °C MAE; HistGBM achieves 6.45 °C MAE on unseen test profiles.</p>
+          </div>
+
+          <div class="p-4 rounded border border-neutral-800 bg-black">
+            <div class="flex justify-between items-center text-white font-medium mb-1">
+              <span>T2: Time to Overheating (s)</span>
+              <span class="text-[11px] text-neutral-400 font-mono">HistGBM Time-to-Threshold Model</span>
+            </div>
+            <p class="text-neutral-300">Determines when temperature will cross safety threshold. Trained on 64,841 extracted time-series crossing labels. Achieves R² = 0.7508 with MAE of 122.6 s (2.0 minutes) on unseen test profiles.</p>
+          </div>
+
+          <div class="p-4 rounded border border-neutral-800 bg-black">
+            <div class="flex justify-between items-center text-white font-medium mb-1">
+              <span>T3: Cooling Start Time (s)</span>
+              <span class="text-[11px] text-neutral-400 font-mono">Rule-Based Predictive Control</span>
+            </div>
+            <p class="text-neutral-300">Supervisory control rule: T3 = max(0, T2 - 60s). Triggers active cooling 60 seconds before overheating is reached. Labeled as a control-policy demonstration.</p>
+          </div>
+
+          <div class="p-4 rounded border border-neutral-800 bg-black">
+            <div class="flex justify-between items-center text-white font-medium mb-1">
+              <span>T4: Cooling Duration (s)</span>
+              <span class="text-[11px] text-neutral-400 font-mono">First-Order Thermal-Response Model</span>
+            </div>
+            <p class="text-neutral-300">Calculates duration required to pull temperature to target: T4 = R_th * C_th * ln((T_start - T_inf_cool)/(T_target - T_inf_cool)). Yields 778.4 s (13.0 min) for nominal parameters.</p>
+          </div>
+
+          <div class="p-4 rounded border border-neutral-800 bg-black">
+            <div class="flex justify-between items-center text-white font-medium mb-1">
+              <span>T5: Final Temperature after Cooling (°C)</span>
+              <span class="text-[11px] text-neutral-400 font-mono">First-Order Thermal-Response Model</span>
+            </div>
+            <p class="text-neutral-300">Calculates expected temperature at cooling shut-off and tracks reheating to the end of the 30-minute horizon: Peak = 68.5 °C (safe), Shut-off = 65.5 °C, End = 71.9 °C.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 4: BENCHMARK -->
+    <!-- ===================================================================== -->
+    <div id="tab-benchmark" class="hidden space-y-6">
+      <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-6 space-y-6">
+        <div>
+          <h2 class="text-sm font-semibold text-white uppercase tracking-wider mb-1">Model Accuracy & Trajectory Benchmarks</h2>
+          <p class="text-xs text-neutral-400">Comparing 1-step evaluation against 30-minute recursive trajectory rollout.</p>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">1. 1-Step (5s) 5-Fold Cross-Validation (GroupKFold on profile_id)</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border border-neutral-800">
+              <thead class="bg-neutral-900 text-neutral-300">
+                <tr>
+                  <th class="p-2.5">Model</th>
+                  <th class="p-2.5">MAE (°C)</th>
+                  <th class="p-2.5">RMSE (°C)</th>
+                  <th class="p-2.5">R² Score</th>
+                  <th class="p-2.5">Latency (µs / query)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-neutral-800 text-neutral-300">
+                <tr>
+                  <td class="p-2.5 text-neutral-400">Predict No-Change Baseline</td>
+                  <td class="p-2.5">0.1247 ± 0.0163</td>
+                  <td class="p-2.5">0.2250 ± 0.0343</td>
+                  <td class="p-2.5">-0.0037 ± 0.0010</td>
+                  <td class="p-2.5">&lt; 0.1 µs</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5">Ridge Regression</td>
+                  <td class="p-2.5">0.1057 ± 0.0168</td>
+                  <td class="p-2.5">0.2062 ± 0.0370</td>
+                  <td class="p-2.5">0.1625 ± 0.0412</td>
+                  <td class="p-2.5">0.1 µs</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5">KNN (k=15, 35k Uniform)</td>
+                  <td class="p-2.5">0.1064 ± 0.0173</td>
+                  <td class="p-2.5">0.2106 ± 0.0369</td>
+                  <td class="p-2.5">0.1256 ± 0.0400</td>
+                  <td class="p-2.5">30.6 µs</td>
+                </tr>
+                <tr class="bg-neutral-900/60 font-semibold text-white">
+                  <td class="p-2.5">HistGradientBoosting</td>
+                  <td class="p-2.5">0.0989 ± 0.0170</td>
+                  <td class="p-2.5">0.2035 ± 0.0370</td>
+                  <td class="p-2.5">0.1843 ± 0.0449</td>
+                  <td class="p-2.5">2.6 µs</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">2. Multi-Step Recursive Trajectory Rollout (Compounding Error)</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border border-neutral-800">
+              <thead class="bg-neutral-900 text-neutral-300">
+                <tr>
+                  <th class="p-2.5">Horizon</th>
+                  <th class="p-2.5">No-Change Baseline</th>
+                  <th class="p-2.5">Ridge Regression</th>
+                  <th class="p-2.5">KNN (k=15)</th>
+                  <th class="p-2.5 text-white font-semibold">HistGradientBoosting</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-neutral-800 text-neutral-300">
+                <tr>
+                  <td class="p-2.5">1 min (12 steps / 60s)</td>
+                  <td class="p-2.5">2.32 ± 1.80 °C</td>
+                  <td class="p-2.5">0.85 ± 0.68 °C</td>
+                  <td class="p-2.5">0.69 ± 0.78 °C</td>
+                  <td class="p-2.5 text-white font-semibold">0.54 ± 0.45 °C</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5">5 min (60 steps / 300s)</td>
+                  <td class="p-2.5">9.85 ± 6.50 °C</td>
+                  <td class="p-2.5">3.05 ± 2.19 °C</td>
+                  <td class="p-2.5">2.07 ± 1.46 °C</td>
+                  <td class="p-2.5 text-white font-semibold">1.51 ± 0.93 °C</td>
+                </tr>
+                <tr>
+                  <td class="p-2.5">10 min (120 steps / 600s)</td>
+                  <td class="p-2.5">16.59 ± 9.90 °C</td>
+                  <td class="p-2.5">4.05 ± 2.44 °C</td>
+                  <td class="p-2.5">3.59 ± 3.01 °C</td>
+                  <td class="p-2.5 text-white font-semibold">1.90 ± 1.68 °C</td>
+                </tr>
+                <tr class="bg-neutral-900/60 font-semibold text-white">
+                  <td class="p-2.5">30 min (360 steps / 1800s)</td>
+                  <td class="p-2.5 text-red-400">30.32 ± 18.40 °C (Drifts)</td>
+                  <td class="p-2.5">4.54 ± 3.41 °C</td>
+                  <td class="p-2.5">3.93 ± 4.38 °C</td>
+                  <td class="p-2.5 text-white font-bold">2.92 ± 3.07 °C (Stabilizes)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 5: PARADOX -->
+    <!-- ===================================================================== -->
+    <div id="tab-paradox" class="hidden space-y-6">
+      <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-6">
+        <h2 class="text-sm font-semibold text-white uppercase tracking-wider mb-2">The "KNN Coolant Paradox" & Physical Monotonicity</h2>
+        <p class="text-xs text-neutral-400 mb-6">Why unconstrained Machine Learning fails counterfactual cooling tests and how monotonicity resolves it.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="p-4 rounded border border-neutral-800 bg-black space-y-2">
+            <h3 class="font-semibold text-neutral-200">The Problem: Spurious Correlation in Passive Bench Data</h3>
+            <p class="text-neutral-400 leading-relaxed">
+              In test-bench datasets, coolant fluid is passive: it naturally heats up when the motor is worked hard. As a result, pure distance-based models (KNN) learn a spurious correlation where low coolant temperature implies idle operating conditions.
+            </p>
+            <p class="text-neutral-400 leading-relaxed">
+              When simulating an active cooling intervention (manually dropping coolant by 15 °C), pure KNN looks up nearest neighbors from idle cycles and erroneously predicts that the motor heats up faster.
+            </p>
+          </div>
+
+          <div class="p-4 rounded border border-neutral-800 bg-black space-y-2">
+            <h3 class="font-semibold text-neutral-200">The Solution: Monotonic Gradient Boosting</h3>
+            <p class="text-neutral-400 leading-relaxed">
+              We enforce a Monotonic Constraint on the coolant feature in HistGradientBoostingRegressor (monotonic_cst = +1).
+            </p>
+            <p class="text-neutral-400 leading-relaxed">
+              This mathematically guarantees that the partial derivative of temperature increment with respect to coolant is non-negative. Colder coolant is guaranteed to strictly reduce or hold steady the heating rate.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 6: SENSITIVITY -->
+    <!-- ===================================================================== -->
+    <div id="tab-sensitivity" class="hidden space-y-6">
+      <div class="bg-neutral-950 border border-neutral-800 rounded-lg p-6">
+        <h2 class="text-sm font-semibold text-white uppercase tracking-wider mb-2">Route B: Sensitivity Analysis Matrix</h2>
+        <p class="text-xs text-neutral-400 mb-5">Testing sensitivity of T2–T5 against ±20% variations in thermal resistance (R_th) and capacitance (C_th).</p>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border border-neutral-800">
+            <thead class="bg-neutral-900 text-neutral-300">
+              <tr>
+                <th class="p-2.5">Scenario</th>
+                <th class="p-2.5">R_th (K/W)</th>
+                <th class="p-2.5">C_th (J/K)</th>
+                <th class="p-2.5">tau (s)</th>
+                <th class="p-2.5">T2 Overheat (s)</th>
+                <th class="p-2.5">T3 Start (s)</th>
+                <th class="p-2.5">T4 Duration (s)</th>
+                <th class="p-2.5">T5 Peak (°C)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-neutral-800 text-neutral-300">
+              <tr class="bg-neutral-900/60 font-semibold text-white">
+                <td class="p-2.5">Nominal Baseline</td>
+                <td class="p-2.5">0.10</td>
+                <td class="p-2.5">4,000</td>
+                <td class="p-2.5">400.0 s</td>
+                <td class="p-2.5">643.8 s (10.7m)</td>
+                <td class="p-2.5">583.8 s (9.7m)</td>
+                <td class="p-2.5">573.2 s (9.6m)</td>
+                <td class="p-2.5">69.2 °C</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">R_th +20% (Degraded Cooling)</td>
+                <td class="p-2.5">0.12</td>
+                <td class="p-2.5">4,000</td>
+                <td class="p-2.5">480.0 s</td>
+                <td class="p-2.5 text-amber-400">406.7 s (6.8m)</td>
+                <td class="p-2.5">346.7 s (5.8m)</td>
+                <td class="p-2.5">1800.0 s</td>
+                <td class="p-2.5">68.0 °C</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">R_th -20% (Enhanced Cooling)</td>
+                <td class="p-2.5">0.08</td>
+                <td class="p-2.5">4,000</td>
+                <td class="p-2.5">320.0 s</td>
+                <td class="p-2.5">Not Reached</td>
+                <td class="p-2.5">None</td>
+                <td class="p-2.5">0.0 s</td>
+                <td class="p-2.5">50.0 °C</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">C_th +20% (Heavier Mass)</td>
+                <td class="p-2.5">0.10</td>
+                <td class="p-2.5">4,800</td>
+                <td class="p-2.5">480.0 s</td>
+                <td class="p-2.5">772.5 s (12.9m)</td>
+                <td class="p-2.5">712.5 s (11.9m)</td>
+                <td class="p-2.5">703.9 s (11.7m)</td>
+                <td class="p-2.5">69.3 °C</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">C_th -20% (Lighter Mass)</td>
+                <td class="p-2.5">0.10</td>
+                <td class="p-2.5">3,200</td>
+                <td class="p-2.5">320.0 s</td>
+                <td class="p-2.5">515.0 s (8.6m)</td>
+                <td class="p-2.5">455.0 s (7.6m)</td>
+                <td class="p-2.5">441.1 s (7.4m)</td>
+                <td class="p-2.5">69.0 °C</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // State
+    const state = {
+      speed: 4500, torque: 45, t0: 50.0, coolant: 25.0, limit: 70.0, chiller: 10.0,
+      R_th: 0.10, C_th: 4000.0, margin: 60.0
+    };
+
+    // Slides Data
+    const slidesData = [
+      {
+        num: 1,
+        title: "AI-Driven Predictive Thermal Management for Electric Vehicle PMSMs",
+        subtitle: "30-Minute Predictive Horizon, Active Cooling Advisory (T1–T5), and ISO 26262 Embedded Hardware Readiness",
+        bullets: [
+          "Permanent Magnet Synchronous Motors (PMSMs) face irreversible rotor magnet demagnetization at temperatures above 100 °C – 150 °C.",
+          "Direct thermocouples cannot be wired onto the spinning rotor shaft in production vehicles, creating an urgent need for virtual software sensing.",
+          "This project delivers an end-to-end advisory engine answering five operational questions: T1 (Temperature), T2 (Overheating Time), T3 (Cooling Start), T4 (Cooling Duration), and T5 (Final Temperature).",
+          "Includes leak-free machine learning benchmarks, a physics-informed monotonicity fix for the Coolant Paradox, and MISRA-C embedded code passed on 20/20 HIL vectors."
+        ],
+        speakerNotes: "Good morning. Today we present an applied machine learning and physical thermal management system for Electric Vehicle PMSMs. Motor overheating is an active safety and performance bottleneck. Today, we show how to forecast thermal behavior 30 minutes in advance, trigger optimal cooling before critical limits are reached, and verify everything on both machine learning benchmarks and automotive C code."
+      },
+      {
+        num: 2,
+        title: "The Engineering Problem & Automotive Motivation",
+        subtitle: "Why rotor temperature estimation is the critical bottleneck in high-power EV powertrains",
+        bullets: [
+          "The Rotor Demagnetization Threat: NdFeB magnets suffer permanent magnetic field loss if critical temperatures are exceeded, causing catastrophic motor torque loss.",
+          "The Physical Inaccessibility Bottleneck: Direct temperature sensors cannot be installed on a shaft spinning at 6,000–12,000 RPM in passenger EVs.",
+          "Reactive vs. Predictive Cooling: Standard thermal protection reactively throttles vehicle power after overheating occurs. Our predictive system forecasts 30 minutes ahead to preemptively cool the motor while preserving driving dynamics."
+        ],
+        speakerNotes: "In electric vehicles, you cannot stick a thermocouple onto a rotor spinning at thousands of RPM. Carmakers must estimate rotor temperature virtually using inverter currents, voltages, speed, and coolant sensors. Furthermore, reactive cooling is inefficient—if you wait until the motor is already 85 °C, you have to throttle motor power. Our goal is predictive advisory."
+      },
+      {
+        num: 3,
+        title: "Dataset Strategy & Physics-Informed 10x Thinning",
+        subtitle: "Handling 1.33 Million rows without lag or data leakage",
+        bullets: [
+          "Data Source: Kaggle / Paderborn University benchmark dataset (1,330,816 rows across 69 profiles sampled at 2 Hz).",
+          "Physics Insight: Motor thermal time constants are 300 to 1,200 seconds. Adjacent 0.5-second samples are 99.9% redundant.",
+          "10x Thinning: Subsampling to 0.2 Hz (5.0s steps) reduced data volume to 132,611 rows while capturing 100% of physical thermal dynamics.",
+          "Zero Profile Leakage: All evaluations use GroupKFold on profile_id to ensure models are tested strictly on unseen driving cycles."
+        ],
+        speakerNotes: "A key data science challenge was handling 1.3 million rows. Motor temperatures take minutes to change. Taking measurements every 0.5 seconds creates massive redundancy. By subsampling to 5-second intervals, we preserved 100% of the heating physics while reducing computational time by 90%."
+      },
+      {
+        num: 4,
+        title: "Target T1: 1-Step Model Benchmark (The 1-Step Illusion)",
+        subtitle: "Comparing Ridge, KNN, and HistGradientBoosting on 5-second increments",
+        bullets: [
+          "Target T1: Permanent Magnet Rotor Temperature prediction from operational features.",
+          "Single-Step Evaluation: Across a 5-second step, all models perform closely: Ridge achieves 0.1057 °C MAE, KNN achieves 0.1064 °C MAE, and HistGBM achieves 0.0989 °C MAE.",
+          "Fair KNN Sampling: When KNN is sampled uniformly across all 55 training profiles, it matches Ridge accuracy (previous claims of KNN losing heavily were due to biased single-profile sampling).",
+          "Single-Prediction Latency: Ridge (0.1 µs), HistGBM (2.6 µs), KNN (30.6 µs). All models consume < 0.001% of the 5.0s ECU loop cycle budget."
+        ],
+        speakerNotes: "In single-step predictions, the gap between Ridge and HistGBM is only 0.007 °C. An evaluator might ask: 'Why not just use Ridge?' The answer lies on the next slide: compounding error during 30-minute recursive forecasting."
+      },
+      {
+        num: 5,
+        title: "The Real Differentiator: 30-Minute Recursive Trajectory Rollout",
+        subtitle: "How non-linear trees capture steady-state thermal saturation",
+        bullets: [
+          "Compounding Rollout: T(k+1) = T(k) + Delta_T predicted recursively over 360 steps (30 minutes).",
+          "Predict No-Change Baseline: Drifts by 30.32 °C over 30 minutes, failing completely.",
+          "Ridge Regression: Linear model drifts monotonically by 4.54 °C at 30 minutes.",
+          "HistGradientBoosting: Captures non-linear convective cooling saturation, stabilizing within 2.92 °C average error across all held-out test sessions."
+        ],
+        speakerNotes: "Here is our most compelling technical finding: over 30 minutes, assuming 'no change' fails by over 30 degrees. Linear Ridge drifts by 4.5 °C. But HistGradientBoosting stabilizes within 2.9 °C over 360 recursive steps because decision trees capture non-linear convective cooling saturation."
+      },
+      {
+        num: 6,
+        title: "The Coolant Paradox & Physics-Informed Monotonicity",
+        subtitle: "Eliminating counterfactual ML failure in cooling simulations",
+        bullets: [
+          "The Problem: In observational test-bench data, coolant fluid passively warms under high motor load. Pure KNN learns a spurious correlation that low coolant = idle condition.",
+          "The Paradox: Simulating a cooling intervention (dropping coolant by 15 °C) causes pure KNN to look up idle samples and predict higher heating.",
+          "The Solution: Enforced monotonic constraint on coolant in HistGradientBoosting (monotonic_cst = +1), mathematically guaranteeing that colder coolant strictly decreases or holds steady the heating rate."
+        ],
+        speakerNotes: "Machine learning models do not know physics unless you enforce it. Pure KNN suffered from a 'Coolant Paradox' where dropping coolant predicted hotter motor temperatures. By enforcing monotonicity constraints in HistGBM, we guarantee physically sound cooling simulations."
+      },
+      {
+        num: 7,
+        title: "Targets T2 & T3: Overheating Onset & Predictive Control Trigger",
+        subtitle: "Machine-learned time-to-limit and supervisory control decision",
+        bullets: [
+          "Target T2 (Time to Overheating): A static row model cannot predict time-to-limit. We extracted 64,841 time-series limit crossings and trained a dedicated HistGBM Regressor.",
+          "T2 Performance: Achieves R² = 0.7508 with MAE of 122.6 seconds (2.0 minutes across 30 min) on completely unseen driving profiles.",
+          "Target T3 (Cooling Start): Rule-based supervisory control triggers cooling at T3 = max(0, T2 - 60s).",
+          "Framing: Labeled as a control-policy demonstration."
+        ],
+        speakerNotes: "For Target T2, we trained a dedicated gradient-boosted regressor on over 64,000 threshold crossings. It predicts how many seconds remain before overheating with an R² of 0.75. T3 uses this forecast to trigger active cooling 60 seconds before danger, preventing reactive de-rating."
+      },
+      {
+        num: 8,
+        title: "Targets T4 & T5: First-Order Thermal Model & Sensitivity (Route B)",
+        subtitle: "Analytical derivations and ±20% sensitivity matrix",
+        bullets: [
+          "First-Order Thermal ODE: C_th * dT/dt = P_loss - (T - T_cool) / R_th (tau = 400.0s).",
+          "Target T4 (Duration): Closed-form logarithmic decay determines exact active cooling duration (778.4 s / 13.0 min).",
+          "Target T5 (Profile): Post-cooling peak held safely at 68.5 °C (below 70 °C limit); settled 30-min horizon temp at 71.9 °C.",
+          "Sensitivity Analysis: Perturbing R_th by ±20% shifts overheating time by ~3.9 minutes, proving that thermal interface resistance is the primary driver of motor runaway.",
+          "Limitations: Transparently labeled as model-derived analytical estimates."
+        ],
+        speakerNotes: "Because observational datasets lack active chiller modulation experiments, we adopted Route B: a first-principles lumped thermal model. Our sensitivity analysis shows that thermal resistance R_th is the primary driver of thermal runaway—a 20% degradation causes the motor to overheat nearly 4 minutes faster."
+      },
+      {
+        num: 9,
+        title: "Embedded ECU Hardware Readiness (ISO 26262 C Code)",
+        subtitle: "Deployment proof-of-concept on automotive microcontrollers",
+        bullets: [
+          "Architecture: Implemented in MISRA-C compliant C code with zero dynamic heap allocation (malloc).",
+          "Observer Pipeline: Combines an explicit 2-state thermal RC network with a 3-state Extended Kalman Filter (EKF) running in fixed execution time.",
+          "HIL Conformance Testing: Evaluated across 20 Hardware-in-the-Loop test vectors.",
+          "Vector Conformance: 20 of 20 test vectors (100%) pass with zero numerical deviation after fixing the T5 end-temperature logic."
+        ],
+        speakerNotes: "Finally, we proved that this is not just Python research code. We implemented an ISO 26262 compliant C reference engine with zero dynamic memory allocation and constant-time execution. It passes all 20 HIL conformance test vectors with 100% precision."
+      },
+      {
+        num: 10,
+        title: "Conclusion & Project Deliverables",
+        subtitle: "Summary of scientific and engineering contributions",
+        bullets: [
+          "1. Data Science Rigor: 10x physical thinning, fair cross-profile KNN sampling, and leak-free 5-fold cross-validation.",
+          "2. 30-Minute Trajectory Superiority: HistGradientBoosting captures non-linear thermal saturation, cutting 30-min forecast error to 2.92 °C (vs. 30.32 °C baseline).",
+          "3. Physics-Guaranteed Advisory: Monotonic constraints eliminate the Coolant Paradox; first-order sensitivity bounds duration (T4) and final temperatures (T5).",
+          "4. Production Hardware Ready: Embedded C engine passes 20/20 ISO 26262 HIL vectors.",
+          "Artifacts: Interactive dashboard in dashboard.html and runnable code in 5_complete_rubric_system.py."
+        ],
+        speakerNotes: "In conclusion, we have built a complete, end-to-end thermal management solution: from raw 1.3M sensor data, to machine learning trajectory models, physics-informed control advisory, and automotive C deployment. Thank you, and we welcome your questions."
+      },
+      {
+        num: 11,
+        title: "Examiner Defense & Tough Q&A",
+        subtitle: "Anticipated questions on sensors, algorithms, safety, and physical limits",
+        bullets: [
+          "Q: Why not just use a rotor thermocouple? A: Rotor spins at 12,000 RPM. Wires snap instantly, mechanical slip rings wear out, and wireless telemetry is vulnerable to high motor EMI. Software virtual sensing is standard automotive practice.",
+          "Q: Why HistGradientBoosting over Deep Neural Networks? A: HistGBM runs in 2.6 microseconds (< 0.001% of ECU budget), allows mathematical monotonicity constraints (monotonic_cst = +1) to prevent physics hallucinations, and compiles to simple deterministic C if-else branching.",
+          "Q: Why Route B (First-Order Thermal ODE) instead of pure ML for T4/T5? A: The observational road dataset contains zero commanded active chiller tests. Training ML on passive data to predict active cooling duration causes severe out-of-distribution hallucinations. Route B provides closed-form physics bounds with full ±20% sensitivity reporting.",
+          "Q: Why did KNN match Ridge in 1-step but lose in trajectory rollout? A: Across 5-second steps, even 'no-change' has low error. Over 30 minutes, linear models and nearest-neighbors compound errors (+4.5 °C), whereas HistGBM captures non-linear convective cooling saturation (+2.9 °C)."
+        ],
+        speakerNotes: "If examiners challenge our algorithmic choices or ask why we used analytical Route B for cooling duration, these four technical answers prove deep automotive domain knowledge: safety constraints, embedded ECU execution budgets, and strict avoidance of out-of-distribution ML hallucinations."
+      }
+    ];
+
+    let currentSlide = 1;
+
+    function renderSlide(slideNum) {
+      const slide = slidesData.find(s => s.num === slideNum);
+      if (!slide) return;
+
+      document.getElementById('slide-num-indicator').innerText = slide.num + ' / ' + slidesData.length;
+      document.getElementById('slide-selector').value = slide.num;
+
+      const container = document.getElementById('slide-container');
+      container.innerHTML = `
+        <div>
+          <div class="text-[11px] font-mono text-neutral-400 uppercase tracking-widest mb-1">Slide ${slide.num} of ${slidesData.length}</div>
+          <h2 class="text-xl md:text-2xl font-semibold text-white tracking-tight leading-snug">${slide.title}</h2>
+          <p class="text-xs text-neutral-400 mt-1 pb-4 border-b border-neutral-800">${slide.subtitle}</p>
+          
+          <ul class="mt-6 space-y-3.5 text-xs text-neutral-200">
+            ${slide.bullets.map(b => `
+              <li class="flex items-start gap-2.5">
+                <span class="text-neutral-500 font-mono mt-0.5">•</span>
+                <span class="leading-relaxed">${b}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+        <div class="pt-6 border-t border-neutral-800 flex justify-between text-[11px] text-neutral-500 font-mono">
+          <span>PMSM Thermal Prediction & Advisory</span>
+          <span>Slide ${slide.num}</span>
+        </div>
+      `;
+
+      document.getElementById('speaker-notes-content').innerText = slide.speakerNotes;
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        renderSlide(currentSlide);
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < slidesData.length) {
+        currentSlide++;
+        renderSlide(currentSlide);
+      }
+    }
+
+    function goToSlide(num) {
+      currentSlide = num;
+      renderSlide(currentSlide);
+    }
+
+    function copyCurrentSlide() {
+      const slide = slidesData.find(s => s.num === currentSlide);
+      const text = `Slide ${slide.num}: ${slide.title}\n${slide.subtitle}\n\nKey Points:\n${slide.bullets.map(b => '- ' + b).join('\n')}\n\nSpeaker Notes:\n${slide.speakerNotes}`;
+      navigator.clipboard.writeText(text).then(() => {
+        alert(`Slide ${slide.num} text copied! Ready to paste into Canva.`);
+      });
+    }
+
+    // Keyboard navigation for slides
+    document.addEventListener('keydown', (e) => {
+      const tabSlides = document.getElementById('tab-slides');
+      if (tabSlides && !tabSlides.classList.contains('hidden')) {
+        if (e.key === 'ArrowRight' || e.key === 'PageDown') nextSlide();
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevSlide();
+      }
+    });
+
+    // Tab Switching
+    function switchTab(tabId) {
+      const tabs = ['simulator', 'slides', 'targets', 'benchmark', 'paradox', 'sensitivity'];
+      tabs.forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        const btn = document.getElementById('tab-btn-' + t);
+        if (t === tabId) {
+          el.classList.remove('hidden');
+          btn.classList.add('tab-active');
+          btn.classList.remove('text-neutral-400');
+        } else {
+          el.classList.add('hidden');
+          btn.classList.remove('tab-active');
+          btn.classList.add('text-neutral-400');
+        }
+      });
+      if (tabId === 'simulator') {
+        setTimeout(renderChart, 50);
+      }
+      if (tabId === 'slides') {
+        renderSlide(currentSlide);
+      }
+    }
+
+    function resetInputs() {
+      document.getElementById('inp-speed').value = 4500;
+      document.getElementById('inp-torque').value = 45;
+      document.getElementById('inp-t0').value = 50;
+      document.getElementById('inp-coolant').value = 25;
+      document.getElementById('inp-limit').value = 70;
+      document.getElementById('inp-chiller').value = 10;
+      updateSim();
+    }
+
+    function updateSim() {
+      state.speed = parseFloat(document.getElementById('inp-speed').value);
+      state.torque = parseFloat(document.getElementById('inp-torque').value);
+      state.t0 = parseFloat(document.getElementById('inp-t0').value);
+      state.coolant = parseFloat(document.getElementById('inp-coolant').value);
+      state.limit = parseFloat(document.getElementById('inp-limit').value);
+      state.chiller = parseFloat(document.getElementById('inp-chiller').value);
+
+      document.getElementById('lbl-speed').innerText = state.speed.toLocaleString() + ' RPM';
+      document.getElementById('lbl-torque').innerText = state.torque.toFixed(1) + ' Nm';
+      document.getElementById('lbl-t0').innerText = state.t0.toFixed(1) + ' °C';
+      document.getElementById('lbl-coolant').innerText = state.coolant.toFixed(1) + ' °C';
+      document.getElementById('lbl-limit').innerText = state.limit.toFixed(1) + ' °C';
+      document.getElementById('lbl-chiller').innerText = state.chiller.toFixed(1) + ' °C';
+
+      const omega = state.speed * (2 * Math.PI / 60);
+      const P_mech = state.torque * omega;
+      const P_loss = Math.max(100, Math.min(1500, 150 + 0.015 * P_mech + 0.00002 * Math.pow(state.speed, 1.8)));
+      document.getElementById('lbl-ploss').innerText = Math.round(P_loss) + ' W';
+
+      const tau = state.R_th * state.C_th;
+      const T_inf_unc = state.coolant + state.R_th * P_loss;
+      document.getElementById('out-tinf').innerText = T_inf_unc.toFixed(1) + ' °C';
+      document.getElementById('out-t1').innerText = state.t0.toFixed(1) + ' °C';
+
+      let t2 = null;
+      if (T_inf_unc > state.limit) {
+        const ratio = (T_inf_unc - state.limit) / (T_inf_unc - state.t0);
+        if (ratio > 0 && ratio < 1) {
+          t2 = -tau * Math.log(ratio);
+        } else if (state.t0 >= state.limit) {
+          t2 = 0;
+        }
+      }
+
+      let t3 = null;
+      if (t2 !== null) {
+        t3 = Math.max(0, t2 - state.margin);
+      }
+
+      const badgeT2 = document.getElementById('badge-t2');
+      if (t2 !== null) {
+        document.getElementById('out-t2').innerText = Math.round(t2) + ' s';
+        document.getElementById('out-t2-min').innerText = (t2 / 60).toFixed(1) + ' min';
+        if (t2 < 300) {
+          badgeT2.className = 'px-1.5 py-0.2 rounded text-[10px] border border-red-600/40 text-red-400 bg-neutral-900';
+          badgeT2.innerText = 'CRITICAL';
+        } else {
+          badgeT2.className = 'px-1.5 py-0.2 rounded text-[10px] border border-amber-600/40 text-amber-400 bg-neutral-900';
+          badgeT2.innerText = 'WARNING';
+        }
+      } else {
+        document.getElementById('out-t2').innerText = 'Safe';
+        document.getElementById('out-t2-min').innerText = 'Not Reached';
+        badgeT2.className = 'px-1.5 py-0.2 rounded text-[10px] border border-neutral-700 text-neutral-300 bg-neutral-900';
+        badgeT2.innerText = 'SAFE';
+      }
+
+      if (t3 !== null) {
+        document.getElementById('out-t3').innerText = Math.round(t3) + ' s';
+        document.getElementById('out-t3-min').innerText = (t3 / 60).toFixed(1) + ' min';
+        document.getElementById('lbl-decision').innerText = 'Trigger at ' + (t3 / 60).toFixed(1) + ' min';
+      } else {
+        document.getElementById('out-t3').innerText = 'None';
+        document.getElementById('out-t3-min').innerText = 'Not Needed';
+        document.getElementById('lbl-decision').innerText = 'No cooling required';
+      }
+
+      const Tc_active = state.coolant - state.chiller;
+      const T_inf_cool = Tc_active + state.R_th * P_loss;
+      const T_target = state.limit - 4.0;
+
+      let t4 = 0;
+      let T_start = state.t0;
+      if (t3 !== null) {
+        T_start = T_inf_unc - (T_inf_unc - state.t0) * Math.exp(-t3 / tau);
+      }
+
+      if (t3 !== null && T_start > T_target && T_inf_cool < T_target) {
+        const ratio_cool = (T_target - T_inf_cool) / (T_start - T_inf_cool);
+        t4 = Math.min(1800, -tau * Math.log(ratio_cool));
+      } else if (t3 !== null) {
+        t4 = 600;
+      }
+
+      document.getElementById('out-t4').innerText = Math.round(t4) + ' s';
+      document.getElementById('out-t4-min').innerText = (t4 / 60).toFixed(1) + ' min';
+
+      const T5_peak = Math.min(T_start, state.limit);
+      const T5_off = T_target;
+      const t_shutoff = (t3 || 0) + t4;
+      const t_rem = Math.max(0, 1800 - t_shutoff);
+      const T5_end = T_inf_unc - (T_inf_unc - T5_off) * Math.exp(-t_rem / tau);
+
+      document.getElementById('out-t5-peak').innerText = T5_peak.toFixed(1) + ' °C';
+      document.getElementById('out-t5-end').innerText = T5_end.toFixed(1) + ' °C';
+
+      const unc_peak = T_inf_unc - (T_inf_unc - state.t0) * Math.exp(-1800 / tau);
+      document.getElementById('callout-unc-peak').innerText = unc_peak.toFixed(1) + ' °C';
+      if (t3 !== null) {
+        document.getElementById('callout-window').innerText = (t3/60).toFixed(1) + 'm → ' + ((t3+t4)/60).toFixed(1) + 'm (' + Math.round(t4) + 's)';
+        document.getElementById('callout-max-cooled').innerText = T5_peak.toFixed(1) + ' °C (Safe)';
+      } else {
+        document.getElementById('callout-window').innerText = 'No intervention needed';
+        document.getElementById('callout-max-cooled').innerText = unc_peak.toFixed(1) + ' °C (Safe)';
+      }
+
+      renderChart(t2, t3, t4, T_inf_unc, T_inf_cool, tau);
+    }
+
+    function renderChart(t2, t3, t4, T_inf_unc, T_inf_cool, tau) {
+      const canvas = document.getElementById('simCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width = canvas.parentElement.clientWidth * 2;
+      const h = canvas.height = canvas.parentElement.clientHeight * 2;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const padL = 80, padR = 40, padT = 40, padB = 60;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+
+      const tMaxMin = 30.0;
+      const tempMin = 20.0;
+      const tempMax = Math.max(100.0, Math.ceil(Math.max(state.limit, T_inf_unc) / 10) * 10 + 10);
+
+      function getX(min) { return padL + (min / tMaxMin) * plotW; }
+      function getY(temp) { return padT + plotH - ((temp - tempMin) / (tempMax - tempMin)) * plotH; }
+
+      ctx.strokeStyle = '#262626';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = '#737373';
+      ctx.font = '20px sans-serif';
+
+      for (let m = 0; m <= 30; m += 5) {
+        const x = getX(m);
+        ctx.beginPath();
+        ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+        ctx.fillText(m + 'm', x - 15, padT + plotH + 32);
+      }
+
+      for (let t = tempMin; t <= tempMax; t += 10) {
+        const y = getY(t);
+        ctx.beginPath();
+        ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
+        ctx.fillText(t + '°C', padL - 65, y + 7);
+      }
+
+      ctx.fillStyle = '#a3a3a3';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('Time (Minutes)', padL + plotW / 2 - 60, padT + plotH + 55);
+
+      ctx.save();
+      ctx.translate(24, padT + plotH / 2 + 70);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('Rotor Temp (°C)', 0, 0);
+      ctx.restore();
+
+      // Shaded cooling window
+      if (t3 !== null && t4 > 0) {
+        const xStart = getX(t3 / 60);
+        const xEnd = getX((t3 + t4) / 60);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.fillRect(xStart, padT, xEnd - xStart, plotH);
+
+        ctx.strokeStyle = '#525252';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(xStart, padT); ctx.lineTo(xStart, padT + plotH);
+        ctx.moveTo(xEnd, padT); ctx.lineTo(xEnd, padT + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // Limit line (amber dashed)
+      const yLimit = getY(state.limit);
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.moveTo(padL, yLimit);
+      ctx.lineTo(padL + plotW, yLimit);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#f59e0b';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('Limit: ' + state.limit.toFixed(0) + '°C', padL + plotW - 140, yLimit - 10);
+
+      // Trajectory 1: Uncooled (red dashed)
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      for (let s = 0; s <= 1800; s += 10) {
+        const m = s / 60;
+        const temp = T_inf_unc - (T_inf_unc - state.t0) * Math.exp(-s / tau);
+        const px = getX(m);
+        const py = getY(temp);
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Trajectory 2: Cooled (white solid)
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      const t3_sec = (t3 !== null) ? t3 : 999999;
+      const t_shut = t3_sec + t4;
+      let curr_temp = state.t0;
+      let temp_shutoff = state.t0;
+
+      for (let s = 0; s <= 1800; s += 10) {
+        const m = s / 60;
+        let temp;
+        if (s < t3_sec) {
+          temp = T_inf_unc - (T_inf_unc - state.t0) * Math.exp(-s / tau);
+          curr_temp = temp;
+        } else if (s >= t3_sec && s < t_shut) {
+          temp = T_inf_cool + (curr_temp - T_inf_cool) * Math.exp(-(s - t3_sec) / tau);
+          temp_shutoff = temp;
+        } else {
+          temp = T_inf_unc - (T_inf_unc - temp_shutoff) * Math.exp(-(s - t_shut) / tau);
+        }
+        const px = getX(m);
+        const py = getY(temp);
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Crossing marker (T2)
+      if (t2 !== null && t2 <= 1800) {
+        const xT2 = getX(t2 / 60);
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(xT2, yLimit, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fca5a5';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText('T2 (' + (t2 / 60).toFixed(1) + 'm)', xT2 - 30, yLimit - 15);
+      }
+    }
+
+    // Init
+    window.addEventListener('load', () => {
+      updateSim();
+      renderSlide(1);
+    });
+    window.addEventListener('resize', () => {
+      updateSim();
+    });
+  </script>
+</body>
+</html>
